@@ -1,8 +1,35 @@
 #include "music_theory.h"
+#include "scale_dictionary.h"
 #include <random>
 #include <algorithm>
+#include <sstream>
 
 namespace Music {
+
+// ============================================================================
+// Utility Functions Implementation
+// ============================================================================
+
+std::string pitchClassToName(PitchClass pc) {
+    if (pc < NUM_KEYS) {
+        return std::string(NOTE_NAMES[pc]);
+    }
+    return "?";
+}
+
+std::string computeScaleNotes(KeyIndex root, const std::vector<int>& intervals) {
+    std::ostringstream oss;
+    
+    PitchClass current = root;
+    oss << NOTE_NAMES[current];
+    
+    for (int interval : intervals) {
+        current = static_cast<PitchClass>((current + interval) % SEMITONES_IN_OCTAVE);
+        oss << " " << NOTE_NAMES[current];
+    }
+    
+    return oss.str();
+}
 
 // ============================================================================
 // ScaleManager Implementation
@@ -10,33 +37,11 @@ namespace Music {
 
 ScaleManager::ScaleManager() 
     : current_key_{0}
-    , current_scale_{"Major", {}}
+    , current_scale_name_{"Major"}
+    , current_intervals_{2, 2, 1, 2, 2, 2, 1}
     , valid_pitch_classes_{}
-    , all_scales_{} {
-    initializeScales();
+    , scale_notes_{} {
     selectRandomKeyAndScale();
-}
-
-void ScaleManager::initializeScales() {
-    all_scales_ = {
-        {"Major", {2, 2, 1, 2, 2, 2, 1}},
-        {"Natural Minor", {2, 1, 2, 2, 1, 2, 2}},
-        {"Pentatonic Major", {2, 2, 3, 2, 3}},
-        {"Pentatonic Minor", {3, 2, 2, 3, 2}},
-        {"Blues", {3, 2, 1, 1, 3, 2}},
-        {"Dorian", {2, 1, 2, 2, 2, 1, 2}},
-        {"Phrygian", {1, 2, 2, 2, 1, 2, 2}},
-        {"Lydian", {2, 2, 2, 1, 2, 2, 1}},
-        {"Mixolydian", {2, 2, 1, 2, 2, 1, 2}},
-        {"Locrian", {1, 2, 2, 1, 2, 2, 2}},
-        {"Dominant Bebop", {2, 2, 1, 2, 2, 1, 1, 2}},
-        {"Major Bebop", {2, 2, 1, 2, 1, 1, 2, 2}},
-        {"Harmonic Minor", {2, 1, 2, 2, 1, 3, 1}},
-        {"Melodic Minor", {2, 1, 2, 2, 2, 2, 1}},
-        {"Arabic (Double Harmonic)", {1, 3, 1, 2, 1, 3, 1}},
-        {"Hirajoshi", {3, 1, 4, 1, 3}},
-        {"Hungarian Minor", {2, 1, 3, 1, 1, 3, 1}}
-    };
 }
 
 void ScaleManager::selectRandomKeyAndScale() {
@@ -47,12 +52,14 @@ void ScaleManager::selectRandomKeyAndScale() {
     std::uniform_int_distribution<> key_dist(0, NUM_KEYS - 1);
     current_key_ = static_cast<KeyIndex>(key_dist(gen));
     
-    // Random scale
-    std::uniform_int_distribution<> scale_dist(0, static_cast<int>(all_scales_.size()) - 1);
-    current_scale_ = all_scales_[scale_dist(gen)];
+    // Get random scale from dictionary
+    const auto& dict = ScaleDictionary::getInstance();
+    current_scale_name_ = dict.getRandomScaleName();
+    current_intervals_ = dict.getIntervals(current_scale_name_);
     
-    // Compute valid pitch classes
+    // Compute valid pitch classes and note names
     computeValidPitchClasses();
+    computeScaleNotes();
 }
 
 void ScaleManager::computeValidPitchClasses() {
@@ -61,7 +68,7 @@ void ScaleManager::computeValidPitchClasses() {
     PitchClass current = current_key_;
     valid_pitch_classes_.push_back(current);
     
-    for (Interval interval : current_scale_.intervals) {
+    for (int interval : current_intervals_) {
         current = static_cast<PitchClass>((current + interval) % SEMITONES_IN_OCTAVE);
         valid_pitch_classes_.push_back(current);
     }
@@ -74,16 +81,28 @@ void ScaleManager::computeValidPitchClasses() {
     );
 }
 
+void ScaleManager::computeScaleNotes() {
+    scale_notes_ = Music::computeScaleNotes(current_key_, current_intervals_);
+}
+
 std::string ScaleManager::getCurrentKeyName() const {
     return std::string(KEY_NAMES[current_key_]);
 }
 
+KeyIndex ScaleManager::getCurrentKeyIndex() const {
+    return current_key_;
+}
+
 std::string ScaleManager::getCurrentScaleName() const {
-    return std::string(current_scale_.name);
+    return current_scale_name_;
 }
 
 std::string ScaleManager::getFullDescription() const {
-    return getCurrentKeyName() + " - " + getCurrentScaleName();
+    return getCurrentKeyName() + " " + getCurrentScaleName();
+}
+
+std::string ScaleManager::getScaleNotes() const {
+    return scale_notes_;
 }
 
 bool ScaleManager::isPitchInScale(PitchClass pitch) const {

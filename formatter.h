@@ -22,8 +22,11 @@ constexpr int NOTE_WIDTH = 4;
 // Print complete tablature to console
 void printTablature(const std::vector<std::unique_ptr<Note>>& notes);
 
-// Print harmonic inspiration info
-void printHarmonicInfo(const std::string& key_and_scale);
+// Print harmonic info with scale notes
+// Format: "C Major (C D E F G A B)"
+void printHarmonicInfo(const std::string& key_name, 
+                       const std::string& scale_name,
+                       const std::string& scale_notes);
 
 } // namespace Formatter
 

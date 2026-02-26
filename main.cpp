@@ -22,8 +22,14 @@ int main() {
     // Print tablature to console
     Formatter::printTablature(generator.getNotes());
     
-    // Print harmonic inspiration
-    Formatter::printHarmonicInfo(generator.getScaleManager().getFullDescription());
+    // Print harmonic inspiration with scale notes
+    // Format: "C Major (C D E F G A B)"
+    const auto& scale_mgr = generator.getScaleManager();
+    Formatter::printHarmonicInfo(
+        scale_mgr.getCurrentKeyName(),
+        scale_mgr.getCurrentScaleName(),
+        scale_mgr.getScaleNotes()
+    );
     
     return 0;  // Immediate exit, no user input
 }

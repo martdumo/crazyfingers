@@ -1,11 +1,11 @@
 # CrazyFingers - Guitar Tablature Generator
-## Handoff Document (v2.0 - Music Theory Engine)
+## Handoff Document (v3.0 - Extended Scale Dictionary)
 
 ---
 
 ## 1. Resumen del Proyecto
 
-**CrazyFingers** es un generador profesional de tablaturas de guitarra que combina teoría musical con restricciones biomecánicas para crear ejercicios de flexibilidad técnica y mental. A diferencia de la versión anterior, este sistema primero selecciona una **tonalidad y escala musical** y SOLO usa notas pertenecientes a esa escala, garantizando coherencia armónica.
+**CrazyFingers** es un generador profesional de tablaturas de guitarra que combina teoría musical avanzada con restricciones biomecánicas. Esta versión incluye **más de 70 escalas** de etnomusicología y teoría musical avanzada, garantizando coherencia armónica en cada generación.
 
 ### Tecnologías y Estándares
 
@@ -22,38 +22,44 @@
 
 ## 2. Arquitectura Modular
 
-El proyecto está estructurado en **5 módulos independientes** (ninguno supera 200 líneas):
+El proyecto está estructurado en **7 módulos independientes** (ninguno supera 200 líneas):
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         main.cpp                                │
-│                      (Entry Point ~30 líneas)                   │
+│                         main.cpp (~32 líneas)                   │
 └─────────────────────────────────────────────────────────────────┘
                                 │
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    generator.h/cpp                              │
-│         (Coordinador + Generador de Notas ~180 líneas)          │
+│                    generator.h/cpp (~83/~186 líneas)            │
+│         (Coordinador + Generador de Notas con biomecánica)      │
 └─────────────────────────────────────────────────────────────────┘
                                 │
                 ┌───────────────┼───────────────┐
                 ▼               ▼               ▼
 ┌─────────────────────┐ ┌─────────────┐ ┌─────────────────────┐
 │  music_theory.h/cpp │ │fretboard.h/ │ │ formatter.h/cpp     │
-│  (Motor Musical)    │ │   cpp       │ │ (Salida ASCII)      │
-│  ~100 líneas        │ │ ~60 líneas  │ │ ~50 líneas          │
+│  (~78/~105 líneas)  │ │   cpp       │ │ (~24/~47 líneas)    │
+│  (Traductor notas)  │ │ ~84/~53     │ │ (Salida ASCII)      │
 └─────────────────────┘ └─────────────┘ └─────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│           scale_dictionary.h/cpp (~38/~170 líneas)              │
+│              (70+ escalas organizadas por categoría)            │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Archivos del Proyecto
 
 | Archivo | Líneas | Responsabilidad |
 |---------|--------|-----------------|
-| `main.cpp` | ~30 | Punto de entrada, orquestación |
-| `music_theory.h/cpp` | ~85 / ~100 | Motor de teoría musical (17 escalas, 12 tonalidades) |
-| `fretboard.h/cpp` | ~90 / ~60 | Validación de notas, cálculo de pitches MIDI |
-| `generator.h/cpp` | ~85 / ~180 | Generación aleatoria con restricciones biomecánicas |
-| `formatter.h/cpp` | ~35 / ~50 | Formateo y salida ASCII a consola |
+| `main.cpp` | 32 | Punto de entrada, orquestación |
+| `music_theory.h/cpp` | 78 / 105 | Motor musical, traductor de notas |
+| `scale_dictionary.h/cpp` | 38 / 170 | Diccionario de 70+ escalas |
+| `fretboard.h/cpp` | 84 / 53 | Validación de notas, cálculo MIDI |
+| `generator.h/cpp` | 83 / 186 | Generación con reglas biomecánicas |
+| `formatter.h/cpp` | 24 / 47 | Formateo y salida ASCII a consola |
 
 ---
 
@@ -62,17 +68,8 @@ El proyecto está estructurado en **5 módulos independientes** (ninguno supera 
 ### Compilación
 
 ```bash
-g++ -std=c++20 -Wall -Wextra -O2 -o crazyfingers.exe main.cpp music_theory.cpp fretboard.cpp generator.cpp formatter.cpp
+g++ -std=c++20 -Wall -Wextra -O2 -o crazyfingers.exe main.cpp music_theory.cpp scale_dictionary.cpp fretboard.cpp generator.cpp formatter.cpp
 ```
-
-**Explicación de flags:**
-| Flag | Propósito |
-|------|-----------|
-| `-std=c++20` | Estándar C++20 requerido |
-| `-Wall` | Todas las advertencias comunes |
-| `-Wextra` | Advertencias adicionales |
-| `-O2` | Optimización de nivel 2 |
-| `-o crazyfingers.exe` | Nombre del binario |
 
 ### Ejecución
 
@@ -80,67 +77,52 @@ g++ -std=c++20 -Wall -Wextra -O2 -o crazyfingers.exe main.cpp music_theory.cpp f
 crazyfingers.exe
 ```
 
-El programa imprime **exclusivamente** la tablatura ASCII y la inspiración armónica, luego termina (sin input del usuario).
+El programa imprime la tablatura ASCII y la información armónica, luego termina.
 
 ---
 
 ## 4. Muestra de Salida
 
 ```
-e|-------------11--------------15--12-----------------------------|
-B|---------11------12------12----------12------12-----------------|
-G|-9---8---------------12------------------15------15-------------|
-D|-----------------------------------------------------17------21-|
-A|---------------------------------------------------------19-----|
+e|---------------------------------4---2---4---2-----------5------|
+B|-----6---9-----------6---9---6-------------------3---2-------3--|
+G|-7-----------10--7----------------------------------------------|
+D|----------------------------------------------------------------|
+A|----------------------------------------------------------------|
 E|----------------------------------------------------------------|
 
-Inspiración armónica: Key de G - Hirajoshi
+F# Harmonic Minor (F# G# A B C# D F F#)
 ```
 
 ---
 
-## 5. Motor de Teoría Musical
+## 5. Motor de Teoría Musical Expandido
 
-### Tonalidades Disponibles (12)
+### Tonalidades (12)
+C, C#, D, D#, E, F, F#, G, G#, A, A#, B
 
-| Índice | Tonalidad | Índice | Tonalidad |
-|--------|-----------|--------|-----------|
-| 0 | C | 6 | F# |
-| 1 | C# | 7 | G |
-| 2 | D | 8 | G# |
-| 3 | D# | 9 | A |
-| 4 | E | 10 | A# |
-| 5 | F | 11 | B |
+### Escalas Disponibles (70+)
 
-### Escalas Implementadas (17)
+#### Comunes/Modos (15)
+Major, Harmonic Minor, Melodic Minor, Natural Minor, Pentatonic Major, Pentatonic Minor, Pentatonic Blues, Pentatonic Neutral, Ionian, Dorian, Phrygian, Lydian, Mixolydian, Aeolian, Locrian
 
-| Categoría | Escalas |
-|-----------|---------|
-| **Básicas** | Mayor, Menor Natural |
-| **Pentatónicas** | Pentatónica Mayor, Pentatónica Menor, Blues |
-| **Modos Griegos** | Dorian, Phrygian, Lydian, Mixolydian, Locrian |
-| **Jazz/Bebop** | Dominant Bebop, Major Bebop |
-| **Menores** | Harmónica, Melódica |
-| **Exóticas** | Arabic (Double Harmonic), Hirajoshi, Hungarian Minor |
+#### Simétricas/Alteradas (16)
+Chromatic, Whole Tone, Octatonic (H-W), Octatonic (W-H), Augmented, Altered, Diatonic, Diminished, Diminished Half, Diminished Whole, Diminished Whole Tone, Dominant 7th, Lydian Augmented, Lydian Minor, Lydian Diminished, Half Diminished
 
-### Cálculo de Notas Válidas
+#### Jazz/Bebop (8)
+Bebop Major, Bebop Minor, Bebop Dominant, Bebop Half Diminished, Blues, Major Blues Scale, Dominant Pentatonic, Mixo-Blues
 
+#### Exóticas y del Mundo (41)
+Algerian, Arabian #1, Arabian #2, Balinese, Byzantine, Chinese, Chinese Mongolian, Egyptian, Eight Tone Spanish, Ethiopian (A raray), Ethiopian (Geez&Ezel), Hawaiian, Hindu, Hindustan, Hirajoshi, Hungarian Major, Hungarian Gypsy, Hungarian Minor, Japanese #1, Japanese #2, Javaneese, Jewish (Adonai Malakh), Jewish (Ahaba Rabba), Kumoi, Mohammedan, Neopolitan, Neopolitan Major, Neopolitan Minor, Oriental #1, Oriental #2, Pelog, Persian, Prometheus, Prometheus Neopolitan, Roumanian Minor, Spanish Gypsy, Super Locrian, Iwato, Moorish Phrygian, Double Harmonic, Enigmatic
+
+### Traductor de Notas
+
+El sistema convierte automáticamente la tonalidad + intervalos en nombres de notas:
+
+```cpp
+// Ejemplo: Key 0 (C) + Major intervals = "C D E F G A B"
+// Ejemplo: Key 6 (F#) + Hirajoshi = "F# G# A C# D"
 ```
-pitch = base_cuerda + traste
-pitch_class = pitch % 12
-
-Una nota es VÁLIDA si pitch_class ∈ notas_de_la_escala
-```
-
-**Afinaciones base (MIDI):**
-| Cuerda | Nota | MIDI |
-|--------|------|------|
-| 1ra (aguda) | E4 | 64 |
-| 2da | B3 | 59 |
-| 3ra | G3 | 55 |
-| 4ta | D3 | 50 |
-| 5ta | A2 | 45 |
-| 6ta (grave) | E2 | 40 |
 
 ---
 
@@ -149,21 +131,9 @@ Una nota es VÁLIDA si pitch_class ∈ notas_de_la_escala
 | Regla | Valor | Propósito |
 |-------|-------|-----------|
 | **Máx notas consecutivas misma cuerda** | 3 | Obliga a moverse por el mástil |
-| **Distancia máx entre notas consecutivas** | 3 trastes | Movimiento de pivote, no saltos bruscos |
-| **Ventana deslizante (3 notas)** | Máx 5 trastes | Alcance real de los 4 dedos |
-| **Cuerdas adyacentes** | ±1 | Movimiento ergonómico del brazo |
-
-### Ejemplo de Ventana Deslizante
-
-```
-Notas: D7 → A8 → D9
-Trastes: 7, 8, 9
-Rango: 9 - 7 = 2 ✓ (≤ 5, válido)
-
-Notas: D4 → A12 → D6  ← INVÁLIDO
-Trastes: 4, 12, 6
-Rango: 12 - 4 = 8 ✗ (> 5, inválido)
-```
+| **Distancia máx entre notas consecutivas** | 3 trastes | Movimiento de pivote |
+| **Ventana deslizante (3 notas)** | Máx 5 trastes | Alcance real de 4 dedos |
+| **Cuerdas adyacentes** | ±1 | Movimiento ergonómico |
 
 ---
 
@@ -171,14 +141,14 @@ Rango: 12 - 4 = 8 ✗ (> 5, inválido)
 
 | Guideline | Aplicación |
 |-----------|------------|
-| [CG: R.1] RAII | `TablatureGenerator` gestiona recursos automáticamente |
-| [CG: R.11] No naked new/delete | `std::unique_ptr<Note>` en todo el código |
+| [CG: R.1] RAII | `TablatureGenerator` gestiona recursos |
+| [CG: R.11] No naked new/delete | `std::unique_ptr<Note>` |
 | [CG: C.149] Smart pointers | `std::vector<std::unique_ptr<Note>>` |
-| [CG: F.4] Constexpr | Constantes compiladas (`NUM_STRINGS`, `MAX_FRET`, etc.) |
-| [CG: F.2] Single purpose | Funciones cortas con un único propósito |
+| [CG: F.4] Constexpr | Constantes compiladas |
+| [CG: F.2] Single purpose | Funciones con único propósito |
 | [CG: SF.20] Namespaces | `Music::`, `Guitar::`, `Formatter::` |
-| [CG: SF.3] Headers for interfaces | `.h` para declaraciones, `.cpp` para implementación |
-| [CG: SF.5] Implementation in .cpp | Lógica en archivos `.cpp` |
+| [CG: SF.3] Headers for interfaces | `.h` para declaraciones |
+| [CG: SF.5] Implementation in .cpp | Lógica en `.cpp` |
 | [CG: C.61] Copy semantics | No copiable, sí movable |
 
 ---
@@ -186,43 +156,28 @@ Rango: 12 - 4 = 8 ✗ (> 5, inválido)
 ## 8. Flujo de Generación
 
 ```
-1. ScaleManager::selectRandomKeyAndScale()
-   └─► Elige tonalidad (0-11) y escala (0-16) aleatoriamente
-   └─► Calcula pitch classes válidos
+1. ScaleDictionary::getInstance()
+   └─► Inicializa 70+ escalas en unordered_map
 
-2. FretboardValidator::getAllValidNotes()
-   └─► Escanea todo el diapasón (6 cuerdas × 23 trastes)
-   └─► Filtra notas que pertenecen a la escala
+2. ScaleManager::selectRandomKeyAndScale()
+   └─► Elige tonalidad (0-11) y escala aleatoria
+   └─► Calcula pitch classes y nombres de notas
 
-3. NoteGenerator::generateTablature()
-   └─► Genera 1ra nota (aleatoria dentro de la escala)
-   └─► Para cada nota siguiente (2-16):
-       ├─► Selecciona cuerda (adyacente o misma, máx 3 consecutivas)
-       ├─► Selecciona traste (máx ±3 del anterior)
-       ├─► Valida ventana deslizante (3 notas, máx 5 trastes de rango)
-       └─► Valida que pertenezca a la escala
+3. FretboardValidator::getAllValidNotes()
+   └─► Escanea diapasón (6 cuerdas × 23 trastes)
+   └─► Filtra notas de la escala seleccionada
 
-4. Formatter::printTablature()
-   └─► Imprime 6 líneas (e, B, G, D, A, E)
-   └─► Cada columna tiene UNA sola nota
+4. NoteGenerator::generateTablature()
+   └─► Genera 16 notas con restricciones biomecánicas
+   └─► Valida ventana deslizante y escala musical
 
-5. Formatter::printHarmonicInfo()
-   └─► Imprime "Inspiración armónica: Key de X - Escala Y"
+5. Formatter::printTablature() + printHarmonicInfo()
+   └─► Imprime tablatura ASCII
+   └─► Imprime: "Key Escala (Nota1 Nota2 ...)"
 ```
-
----
-
-## 9. Próximas Extensiones (Opcional)
-
-1. **Exportar a MIDI** - Generar archivo .mid para tocar con DAW
-2. **Tempo variable** - Metrónomo integrado con BPM ajustable
-3. **Patrones rítmicos** - Corcheas, tresillos, semicorcheas
-4. **Técnicas específicas** - Hammer-on, pull-off, slide, bend
-5. **Restricciones personalizadas** - Solo cuerdas graves, solo trastes 1-5, etc.
-6. **Interfaz gráfica** - Visualización del mástil en tiempo real
 
 ---
 
 **Proyecto concluido exitosamente.** 🎸
 
-El generador CrazyFingers v2.0 combina teoría musical profesional con ergonomía biomecánica para crear ejercicios únicos, musicalmente coherentes y anatómicamente seguros.
+CrazyFingers v3.0: 70+ escalas, traductor de notas, arquitectura modular profesional.

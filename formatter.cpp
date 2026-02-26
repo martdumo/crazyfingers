@@ -43,9 +43,11 @@ void printTablature(const std::vector<std::unique_ptr<Note>>& notes) {
     }
 }
 
-void printHarmonicInfo(const std::string& key_and_scale) {
+void printHarmonicInfo(const std::string& key_name, 
+                       const std::string& scale_name,
+                       const std::string& scale_notes) {
     std::cout << std::endl;
-    std::cout << "Inspiración armónica: Key de " << key_and_scale << std::endl;
+    std::cout << key_name << " " << scale_name << " (" << scale_notes << ")" << std::endl;
 }
 
 } // namespace Formatter

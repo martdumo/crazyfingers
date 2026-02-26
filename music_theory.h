@@ -20,24 +20,18 @@ constexpr int NUM_KEYS = 12;
 // ============================================================================
 
 using KeyIndex = uint8_t;
-using Interval = uint8_t;
 using PitchClass = uint8_t;  // 0-11 (C, C#, D, ..., B)
 
 // ============================================================================
-// Key Names (0=C, 1=C#, 2=D, ..., 11=B)
+// Note Names (0=C, 1=C#, 2=D, ..., 11=B)
 // ============================================================================
 
-constexpr std::array<const char*, NUM_KEYS> KEY_NAMES = {
+constexpr std::array<const char*, NUM_KEYS> NOTE_NAMES = {
     "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
 };
 
-// ============================================================================
-// Scale Definitions (intervals in semitones)
-// ============================================================================
-
-struct ScaleDefinition {
-    const char* name;
-    std::vector<Interval> intervals;
+constexpr std::array<const char*, NUM_KEYS> KEY_NAMES = {
+    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
 };
 
 // ============================================================================
@@ -54,11 +48,17 @@ public:
     // Get current key name (e.g., "F#")
     [[nodiscard]] std::string getCurrentKeyName() const;
     
+    // Get current key index (0-11)
+    [[nodiscard]] KeyIndex getCurrentKeyIndex() const;
+    
     // Get current scale name (e.g., "Pentatonic Minor")
     [[nodiscard]] std::string getCurrentScaleName() const;
     
     // Get full description (e.g., "F# - Pentatonic Minor")
     [[nodiscard]] std::string getFullDescription() const;
+    
+    // Get scale notes as string (e.g., "C D E F G A B")
+    [[nodiscard]] std::string getScaleNotes() const;
     
     // Check if a pitch class (0-11) belongs to current scale
     [[nodiscard]] bool isPitchInScale(PitchClass pitch) const;
@@ -71,13 +71,24 @@ public:
 
 private:
     void computeValidPitchClasses();
-    void initializeScales();
+    void computeScaleNotes();
     
     KeyIndex current_key_;
-    ScaleDefinition current_scale_;
+    std::string current_scale_name_;
+    std::vector<int> current_intervals_;  // Use int to match ScaleDictionary
     std::vector<PitchClass> valid_pitch_classes_;
-    std::vector<ScaleDefinition> all_scales_;
+    std::string scale_notes_;  // Formatted note names
 };
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+// Convert pitch class to note name
+[[nodiscard]] std::string pitchClassToName(PitchClass pc);
+
+// Get scale notes from root key and intervals
+[[nodiscard]] std::string computeScaleNotes(KeyIndex root, const std::vector<int>& intervals);
 
 } // namespace Music
 
