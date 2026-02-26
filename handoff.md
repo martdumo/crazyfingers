@@ -1,41 +1,78 @@
 # CrazyFingers - Guitar Tablature Generator
-## Handoff Document
+## Handoff Document (v2.0 - Music Theory Engine)
 
 ---
 
 ## 1. Resumen del Proyecto
 
-**CrazyFingers** es un generador de tablaturas de guitarra aleatorias diseñado específicamente para crear ejercicios de flexibilidad técnica y mental. El programa produce secuencias de 16 notas que son anatómicamente posibles de tocar pero deliberadamente "incómodas", rompiendo los patrones predecibles de escalas tradicionales.
+**CrazyFingers** es un generador profesional de tablaturas de guitarra que combina teoría musical con restricciones biomecánicas para crear ejercicios de flexibilidad técnica y mental. A diferencia de la versión anterior, este sistema primero selecciona una **tonalidad y escala musical** y SOLO usa notas pertenecientes a esa escala, garantizando coherencia armónica.
 
-### Tecnologías y Estándares Utilizados
+### Tecnologías y Estándares
 
 | Tecnología | Propósito |
 |------------|-----------|
-| **C++20** | Estándar moderno con `constexpr`, `std::span`, `std::array` |
-| **RAII** | Gestión automática de recursos sin fugas de memoria [CG: R.1] |
-| **`std::unique_ptr`** | Memoria dinámica segura sin "naked new/delete" [CG: R.11, C.149] |
+| **C++20** | Estándar moderno con `constexpr`, `std::unique_ptr`, `std::array` |
+| **RAII** | Gestión automática de recursos [CG: R.1] |
+| **`std::unique_ptr`** | Memoria dinámica segura [CG: R.11, C.149] |
 | **`<random>` (std::mt19937)** | Generación de aleatoriedad de alta calidad |
-| **C++ Core Guidelines** | Conjunto de buenas prácticas de Bjarne Stroustrup |
-| **Namespaces** | Organización lógica del código (`GuitarTab::`, `Formatter::`) [CG: SF.20] |
+| **C++ Core Guidelines** | Buenas prácticas de Bjarne Stroustrup |
+| **Namespaces** | Organización lógica (`Music::`, `Guitar::`, `Formatter::`) [CG: SF.20] |
 
 ---
 
-## 2. Instrucciones de Compilación y Ejecución
+## 2. Arquitectura Modular
+
+El proyecto está estructurado en **5 módulos independientes** (ninguno supera 200 líneas):
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         main.cpp                                │
+│                      (Entry Point ~30 líneas)                   │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    generator.h/cpp                              │
+│         (Coordinador + Generador de Notas ~180 líneas)          │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                ┌───────────────┼───────────────┐
+                ▼               ▼               ▼
+┌─────────────────────┐ ┌─────────────┐ ┌─────────────────────┐
+│  music_theory.h/cpp │ │fretboard.h/ │ │ formatter.h/cpp     │
+│  (Motor Musical)    │ │   cpp       │ │ (Salida ASCII)      │
+│  ~100 líneas        │ │ ~60 líneas  │ │ ~50 líneas          │
+└─────────────────────┘ └─────────────┘ └─────────────────────┘
+```
+
+### Archivos del Proyecto
+
+| Archivo | Líneas | Responsabilidad |
+|---------|--------|-----------------|
+| `main.cpp` | ~30 | Punto de entrada, orquestación |
+| `music_theory.h/cpp` | ~85 / ~100 | Motor de teoría musical (17 escalas, 12 tonalidades) |
+| `fretboard.h/cpp` | ~90 / ~60 | Validación de notas, cálculo de pitches MIDI |
+| `generator.h/cpp` | ~85 / ~180 | Generación aleatoria con restricciones biomecánicas |
+| `formatter.h/cpp` | ~35 / ~50 | Formateo y salida ASCII a consola |
+
+---
+
+## 3. Instrucciones de Compilación y Ejecución
 
 ### Compilación
 
 ```bash
-g++ -std=c++20 -Wall -Wextra -O2 -o crazyfingers.exe main.cpp
+g++ -std=c++20 -Wall -Wextra -O2 -o crazyfingers.exe main.cpp music_theory.cpp fretboard.cpp generator.cpp formatter.cpp
 ```
 
 **Explicación de flags:**
 | Flag | Propósito |
 |------|-----------|
-| `-std=c++20` | Habilita el estándar C++20 requerido |
-| `-Wall` | Activa todas las advertencias comunes |
-| `-Wextra` | Activa advertencias adicionales |
-| `-O2` | Optimización de nivel 2 para rendimiento |
-| `-o crazyfingers.exe` | Nombre del binario de salida |
+| `-std=c++20` | Estándar C++20 requerido |
+| `-Wall` | Todas las advertencias comunes |
+| `-Wextra` | Advertencias adicionales |
+| `-O2` | Optimización de nivel 2 |
+| `-o crazyfingers.exe` | Nombre del binario |
 
 ### Ejecución
 
@@ -43,125 +80,149 @@ g++ -std=c++20 -Wall -Wextra -O2 -o crazyfingers.exe main.cpp
 crazyfingers.exe
 ```
 
-El programa imprimirá **exclusivamente** la tablatura ASCII en la consola y terminará inmediatamente (sin pedir input al usuario).
+El programa imprime **exclusivamente** la tablatura ASCII y la inspiración armónica, luego termina (sin input del usuario).
 
 ---
 
-## 3. Muestra de Salida
+## 4. Muestra de Salida
 
 ```
-e|-----------------------------13----------5---3------------------|
-B|-12----------------------16------9---7-----------7--------------|
-G|-----17--15----------20------------------------------7----------|
-D|-------------19--21--------------------------------------3---1--|
-A|----------------------------------------------------------------|
+e|-------------11--------------15--12-----------------------------|
+B|---------11------12------12----------12------12-----------------|
+G|-9---8---------------12------------------15------15-------------|
+D|-----------------------------------------------------17------21-|
+A|---------------------------------------------------------19-----|
 E|----------------------------------------------------------------|
-```
 
-**Características visibles:**
-- ✅ 16 notas (16 columnas con números)
-- ✅ Una sola nota por posición vertical (ejercicio monofónico)
-- ✅ Movimiento a través de 5 cuerdas diferentes (B, G, D + saltos)
-- ✅ Saltos entre cuerdas adyacentes únicamente
-- ✅ Trastes dentro del rango 0-22
-
----
-
-## 4. Análisis Biomecánico y Algorítmico
-
-### Por qué este algoritmo genera ejercicios excepcionales
-
-#### 🎯 La Limitación de "Distancia Máxima de 5 Trastes"
-
-Esta restricción no es arbitraria: representa el **rango ergonómico natural** de la mano izquierda en posición estándar. Un estiramiento de 5 trastes (ej. índice en traste 5, meñique en traste 10) es el límite seguro para la mayoría de guitarristas sin cambiar de posición. 
-
-**Beneficio biomecánico:**
-- Evita lesiones por sobre-extensión del tendón flexor
-- Mantiene la mano en una posición anatómicamente neutra
-- Obliga al cerebro a encontrar soluciones dentro de restricciones realistas
-
-#### 🔓 Rompiendo los "Box Patterns" (Patrones de Caja)
-
-Los guitarristas tienden a memorizar formas geométricas fijas (pentatónicas, modos, etc.). El algoritmo **fuerza un cambio de cuerda obligatoria en la 3ra nota consecutiva**, lo que destruye estas formas predecibles:
-
-```
-Patrón típico de escala (predecible):
-e|-----5-7-8---------------------------------|
-B|-------5-7-8-------------------------------|
-G|---------5-7-9-----------------------------|
-...
-
-CrazyFingers (impredecible):
-e|-----------------7-------------------------|
-B|-------------5-8---5-----------------------|
-G|---------5-7-----------7-5-----------------|
-D|-----5-7-------------------7-8-------------|
-```
-
-**Beneficio cognitivo:**
-- El cerebro no puede automatizar el patrón
-- Cada nota requiere atención consciente
-- Desarrolla lectura instantánea y adaptación
-
-#### ⚡ Movimiento en Cuerdas Adyacentes: Sorpresa sin Lesión
-
-La regla de **solo cuerdas adyacentes (±1)** crea un equilibrio perfecto:
-
-| Movimiento | Riesgo | Beneficio Técnico |
-|------------|--------|-------------------|
-| Saltos grandes (ej. 6ta→2da) | Alto (brazo se desplaza bruscamente) | ❌ Evitado |
-| Misma cuerda siempre | Bajo (pero aburrido) | ❌ Sin flexibilidad |
-| **Adyacente (±1)** | **Mínimo** | ✅ **Brazo estable, dedos alertas** |
-
-**El efecto de "sorpresa controlada":**
-1. El antebrazo se mantiene en una zona estable
-2. Los dedos deben recalcular constantemente su posición relativa
-3. La mano "se sorprende" pero nunca está en peligro
-4. Se desarrolla **propiocepción fina** (conciencia de posición sin mirar)
-
----
-
-## 5. Estructura de Archivos del Proyecto
-
-```
-crazyfingers/
-├── blueprint.md          # Arquitectura y diseño del sistema
-├── main.cpp              # Implementación completa en C++20
-├── crazyfingers.exe      # Binario compilado (Windows)
-└── handoff.md            # Este documento (entrega final)
+Inspiración armónica: Key de G - Hirajoshi
 ```
 
 ---
 
-## 6. C++ Core Guidelines Aplicadas
+## 5. Motor de Teoría Musical
 
-| Guideline | Aplicación en el código |
-|-----------|------------------------|
+### Tonalidades Disponibles (12)
+
+| Índice | Tonalidad | Índice | Tonalidad |
+|--------|-----------|--------|-----------|
+| 0 | C | 6 | F# |
+| 1 | C# | 7 | G |
+| 2 | D | 8 | G# |
+| 3 | D# | 9 | A |
+| 4 | E | 10 | A# |
+| 5 | F | 11 | B |
+
+### Escalas Implementadas (17)
+
+| Categoría | Escalas |
+|-----------|---------|
+| **Básicas** | Mayor, Menor Natural |
+| **Pentatónicas** | Pentatónica Mayor, Pentatónica Menor, Blues |
+| **Modos Griegos** | Dorian, Phrygian, Lydian, Mixolydian, Locrian |
+| **Jazz/Bebop** | Dominant Bebop, Major Bebop |
+| **Menores** | Harmónica, Melódica |
+| **Exóticas** | Arabic (Double Harmonic), Hirajoshi, Hungarian Minor |
+
+### Cálculo de Notas Válidas
+
+```
+pitch = base_cuerda + traste
+pitch_class = pitch % 12
+
+Una nota es VÁLIDA si pitch_class ∈ notas_de_la_escala
+```
+
+**Afinaciones base (MIDI):**
+| Cuerda | Nota | MIDI |
+|--------|------|------|
+| 1ra (aguda) | E4 | 64 |
+| 2da | B3 | 59 |
+| 3ra | G3 | 55 |
+| 4ta | D3 | 50 |
+| 5ta | A2 | 45 |
+| 6ta (grave) | E2 | 40 |
+
+---
+
+## 6. Reglas Biomecánicas
+
+| Regla | Valor | Propósito |
+|-------|-------|-----------|
+| **Máx notas consecutivas misma cuerda** | 3 | Obliga a moverse por el mástil |
+| **Distancia máx entre notas consecutivas** | 3 trastes | Movimiento de pivote, no saltos bruscos |
+| **Ventana deslizante (3 notas)** | Máx 5 trastes | Alcance real de los 4 dedos |
+| **Cuerdas adyacentes** | ±1 | Movimiento ergonómico del brazo |
+
+### Ejemplo de Ventana Deslizante
+
+```
+Notas: D7 → A8 → D9
+Trastes: 7, 8, 9
+Rango: 9 - 7 = 2 ✓ (≤ 5, válido)
+
+Notas: D4 → A12 → D6  ← INVÁLIDO
+Trastes: 4, 12, 6
+Rango: 12 - 4 = 8 ✗ (> 5, inválido)
+```
+
+---
+
+## 7. C++ Core Guidelines Aplicadas
+
+| Guideline | Aplicación |
+|-----------|------------|
 | [CG: R.1] RAII | `TablatureGenerator` gestiona recursos automáticamente |
 | [CG: R.11] No naked new/delete | `std::unique_ptr<Note>` en todo el código |
-| [CG: C.149] Smart pointers | `std::vector<std::unique_ptr<Note>>` para la secuencia |
-| [CG: F.4] Constexpr | Constantes de guitarra evaluadas en compile-time |
-| [CG: F.2] Single purpose | Funciones cortas con un único propósito lógico |
-| [CG: SF.20] Namespaces | `GuitarTab::` y `Formatter::` para estructura lógica |
-| [CG: ES.47] nullptr | Usado en lugar de `0` o `NULL` |
-| [CG: P.10] Inmutabilidad | `const` y `constexpr` donde sea posible |
-| [CG: C.10] Clean structs | `Note`, `Fret`, `StringIndex` con semántica clara |
-| [CG: C.61] Copy semantics | No copiable, sí movable para el generador |
+| [CG: C.149] Smart pointers | `std::vector<std::unique_ptr<Note>>` |
+| [CG: F.4] Constexpr | Constantes compiladas (`NUM_STRINGS`, `MAX_FRET`, etc.) |
+| [CG: F.2] Single purpose | Funciones cortas con un único propósito |
+| [CG: SF.20] Namespaces | `Music::`, `Guitar::`, `Formatter::` |
+| [CG: SF.3] Headers for interfaces | `.h` para declaraciones, `.cpp` para implementación |
+| [CG: SF.5] Implementation in .cpp | Lógica en archivos `.cpp` |
+| [CG: C.61] Copy semantics | No copiable, sí movable |
 
 ---
 
-## 7. Próximos Pasos (Opcional)
+## 8. Flujo de Generación
 
-Si deseas extender el proyecto:
+```
+1. ScaleManager::selectRandomKeyAndScale()
+   └─► Elige tonalidad (0-11) y escala (0-16) aleatoriamente
+   └─► Calcula pitch classes válidos
 
-1. **Exportar a formatos**: MIDI, Guitar Pro, MusicXML
-2. **Modos de dificultad**: Fácil (3 trastes máx), Difícil (6-7 trastes)
-3. **Restricciones personalizadas**: Forzar cuerdas específicas, rangos de trastes
-4. **Interfaz gráfica**: Visualización en tiempo real del diapasón
-5. **Metrónomo integrado**: Tempo ajustable para práctica
+2. FretboardValidator::getAllValidNotes()
+   └─► Escanea todo el diapasón (6 cuerdas × 23 trastes)
+   └─► Filtra notas que pertenecen a la escala
+
+3. NoteGenerator::generateTablature()
+   └─► Genera 1ra nota (aleatoria dentro de la escala)
+   └─► Para cada nota siguiente (2-16):
+       ├─► Selecciona cuerda (adyacente o misma, máx 3 consecutivas)
+       ├─► Selecciona traste (máx ±3 del anterior)
+       ├─► Valida ventana deslizante (3 notas, máx 5 trastes de rango)
+       └─► Valida que pertenezca a la escala
+
+4. Formatter::printTablature()
+   └─► Imprime 6 líneas (e, B, G, D, A, E)
+   └─► Cada columna tiene UNA sola nota
+
+5. Formatter::printHarmonicInfo()
+   └─► Imprime "Inspiración armónica: Key de X - Escala Y"
+```
+
+---
+
+## 9. Próximas Extensiones (Opcional)
+
+1. **Exportar a MIDI** - Generar archivo .mid para tocar con DAW
+2. **Tempo variable** - Metrónomo integrado con BPM ajustable
+3. **Patrones rítmicos** - Corcheas, tresillos, semicorcheas
+4. **Técnicas específicas** - Hammer-on, pull-off, slide, bend
+5. **Restricciones personalizadas** - Solo cuerdas graves, solo trastes 1-5, etc.
+6. **Interfaz gráfica** - Visualización del mástil en tiempo real
 
 ---
 
 **Proyecto concluido exitosamente.** 🎸
 
-El generador CrazyFingers está listo para usar. Cada ejecución produce un ejercicio único que desafiará tanto tu técnica como tu capacidad de adaptación mental en el instrumento.
+El generador CrazyFingers v2.0 combina teoría musical profesional con ergonomía biomecánica para crear ejercicios únicos, musicalmente coherentes y anatómicamente seguros.
