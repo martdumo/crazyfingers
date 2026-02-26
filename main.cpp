@@ -4,6 +4,7 @@
 
 #include "generator.h"
 #include "formatter.h"
+#include "easter_egg.h"
 #include <iostream>
 
 // ============================================================================
@@ -30,6 +31,10 @@ int main() {
         scale_mgr.getCurrentScaleName(),
         scale_mgr.getScaleNotes()
     );
+    
+    // Print absurd Easter egg fact
+    // Format: "Sabía usted que [Sujeto] [Acción] [Motivo]?"
+    std::cout << EasterEgg::generateAbsurdFact() << std::endl;
     
     return 0;  // Immediate exit, no user input
 }
