@@ -19,14 +19,17 @@ constexpr int NOTE_WIDTH = 4;
 // Format a single note position for a given string
 [[nodiscard]] std::string formatNotePosition(const Note* note, int current_string);
 
-// Print complete tablature to console
-void printTablature(const std::vector<std::unique_ptr<Note>>& notes);
+// Print complete tablature to console (adapts to instrument string count)
+void printTablature(const std::vector<std::unique_ptr<Note>>& notes, int num_strings);
 
 // Print harmonic info with scale notes
 // Format: "C Major (C D E F G A B)"
-void printHarmonicInfo(const std::string& key_name, 
+void printHarmonicInfo(const std::string& key_name,
                        const std::string& scale_name,
                        const std::string& scale_notes);
+
+// Print instrument info
+void printInstrumentInfo(InstrumentType type);
 
 } // namespace Formatter
 
