@@ -137,10 +137,22 @@ class TablatureGenerator {
 public:
     explicit TablatureGenerator(InstrumentType instrument);
 
+    // Generate new tablature (random key/scale)
     void generate();
+    
+    // Regenerate with same key/scale (for re-roll)
+    void regenerate();
+    
+    // Set specific key and scale (for advanced mode)
+    void setKeyAndScale(Music::KeyIndex key, const std::string& scale_name);
+
     [[nodiscard]] const std::vector<std::unique_ptr<Note>>& getNotes() const noexcept;
     [[nodiscard]] const Music::ScaleManager& getScaleManager() const noexcept;
     [[nodiscard]] InstrumentType getInstrumentType() const noexcept;
+    
+    // Get current key index (for re-roll with same settings)
+    [[nodiscard]] Music::KeyIndex getCurrentKeyIndex() const noexcept;
+    [[nodiscard]] std::string getCurrentScaleName() const noexcept;
 
     // Non-copyable, movable
     TablatureGenerator(const TablatureGenerator&) = delete;
@@ -155,6 +167,7 @@ private:
     std::unique_ptr<FretboardValidator> validator_;
     std::unique_ptr<NoteGenerator> note_gen_;
     std::vector<std::unique_ptr<Note>> notes_;
+    bool use_random_settings_;  // Track if we're using random or fixed settings
 };
 
 } // namespace Guitar

@@ -322,10 +322,30 @@ TablatureGenerator::TablatureGenerator(InstrumentType instrument)
     , scale_mgr_{}
     , validator_{std::make_unique<FretboardValidator>(scale_mgr_, instrument)}
     , note_gen_{std::make_unique<NoteGenerator>(*validator_)}
-    , notes_{} {}
+    , notes_{}
+    , use_random_settings_{true} {}
 
 void TablatureGenerator::generate() {
+    if (use_random_settings_) {
+        scale_mgr_.selectRandomKeyAndScale();
+    }
+    // Rebuild validator with current scale
+    validator_ = std::make_unique<FretboardValidator>(scale_mgr_, instrument_);
+    note_gen_ = std::make_unique<NoteGenerator>(*validator_);
     notes_ = note_gen_->generateTablature();
+}
+
+void TablatureGenerator::regenerate() {
+    // Regenerate with same key/scale (don't call selectRandomKeyAndScale)
+    // Rebuild validator with current scale
+    validator_ = std::make_unique<FretboardValidator>(scale_mgr_, instrument_);
+    note_gen_ = std::make_unique<NoteGenerator>(*validator_);
+    notes_ = note_gen_->generateTablature();
+}
+
+void TablatureGenerator::setKeyAndScale(Music::KeyIndex key, const std::string& scale_name) {
+    scale_mgr_.setKeyAndScale(key, scale_name);
+    use_random_settings_ = false;
 }
 
 const std::vector<std::unique_ptr<Note>>& TablatureGenerator::getNotes() const noexcept {
@@ -338,6 +358,14 @@ const Music::ScaleManager& TablatureGenerator::getScaleManager() const noexcept 
 
 InstrumentType TablatureGenerator::getInstrumentType() const noexcept {
     return instrument_;
+}
+
+Music::KeyIndex TablatureGenerator::getCurrentKeyIndex() const noexcept {
+    return scale_mgr_.getCurrentKeyIndex();
+}
+
+std::string TablatureGenerator::getCurrentScaleName() const noexcept {
+    return scale_mgr_.getCurrentScaleName();
 }
 
 } // namespace Guitar

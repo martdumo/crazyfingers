@@ -3,6 +3,7 @@
 #include <random>
 #include <algorithm>
 #include <sstream>
+#include <cctype>
 
 namespace Music {
 
@@ -19,16 +20,40 @@ std::string pitchClassToName(PitchClass pc) {
 
 std::string computeScaleNotes(KeyIndex root, const std::vector<int>& intervals) {
     std::ostringstream oss;
-    
+
     PitchClass current = root;
     oss << NOTE_NAMES[current];
-    
+
     for (int interval : intervals) {
         current = static_cast<PitchClass>((current + interval) % SEMITONES_IN_OCTAVE);
         oss << " " << NOTE_NAMES[current];
     }
-    
+
     return oss.str();
+}
+
+int parseKeyName(const std::string& name) {
+    if (name.empty()) return -1;
+    
+    // Convert to uppercase for case-insensitive comparison
+    std::string upperName;
+    upperName.reserve(name.size());
+    for (char c : name) {
+        upperName.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(c))));
+    }
+    
+    // Search through KEY_NAMES
+    for (int i = 0; i < NUM_KEYS; ++i) {
+        if (upperName == KEY_NAMES[i]) {
+            return i;
+        }
+    }
+    
+    return -1;  // Invalid key name
+}
+
+std::vector<std::string> getScalesWithIds() {
+    return ScaleDictionary::getInstance().getAllScaleNames();
 }
 
 // ============================================================================
@@ -47,15 +72,28 @@ ScaleManager::ScaleManager()
 void ScaleManager::selectRandomKeyAndScale() {
     std::random_device rd;
     std::mt19937 gen(rd());
-    
+
     // Random key (0-11)
     std::uniform_int_distribution<> key_dist(0, NUM_KEYS - 1);
     current_key_ = static_cast<KeyIndex>(key_dist(gen));
-    
+
     // Get random scale from dictionary
     const auto& dict = ScaleDictionary::getInstance();
     current_scale_name_ = dict.getRandomScaleName();
     current_intervals_ = dict.getIntervals(current_scale_name_);
+
+    // Compute valid pitch classes and note names
+    computeValidPitchClasses();
+    computeScaleNotes();
+}
+
+void ScaleManager::setKeyAndScale(KeyIndex key, const std::string& scale_name) {
+    current_key_ = key;
+    current_scale_name_ = scale_name;
+    
+    // Get intervals for the selected scale
+    const auto& dict = ScaleDictionary::getInstance();
+    current_intervals_ = dict.getIntervals(scale_name);
     
     // Compute valid pitch classes and note names
     computeValidPitchClasses();

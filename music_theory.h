@@ -41,38 +41,41 @@ constexpr std::array<const char*, NUM_KEYS> KEY_NAMES = {
 class ScaleManager {
 public:
     ScaleManager();
-    
+
     // Select random key and scale
     void selectRandomKeyAndScale();
-    
+
+    // Manual selection (for advanced mode)
+    void setKeyAndScale(KeyIndex key, const std::string& scale_name);
+
     // Get current key name (e.g., "F#")
     [[nodiscard]] std::string getCurrentKeyName() const;
-    
+
     // Get current key index (0-11)
     [[nodiscard]] KeyIndex getCurrentKeyIndex() const;
-    
+
     // Get current scale name (e.g., "Pentatonic Minor")
     [[nodiscard]] std::string getCurrentScaleName() const;
-    
+
     // Get full description (e.g., "F# - Pentatonic Minor")
     [[nodiscard]] std::string getFullDescription() const;
-    
+
     // Get scale notes as string (e.g., "C D E F G A B")
     [[nodiscard]] std::string getScaleNotes() const;
-    
+
     // Check if a pitch class (0-11) belongs to current scale
     [[nodiscard]] bool isPitchInScale(PitchClass pitch) const;
-    
+
     // Check if a MIDI pitch is valid for current key/scale
     [[nodiscard]] bool isMidiPitchValid(int midi_pitch) const;
-    
+
     // Get all valid pitch classes for current scale
     [[nodiscard]] const std::vector<PitchClass>& getValidPitchClasses() const;
 
 private:
     void computeValidPitchClasses();
     void computeScaleNotes();
-    
+
     KeyIndex current_key_;
     std::string current_scale_name_;
     std::vector<int> current_intervals_;  // Use int to match ScaleDictionary
@@ -89,6 +92,13 @@ private:
 
 // Get scale notes from root key and intervals
 [[nodiscard]] std::string computeScaleNotes(KeyIndex root, const std::vector<int>& intervals);
+
+// Parse key name string to index (case-insensitive)
+// Returns -1 if invalid, otherwise 0-11 (C=0, C#=1, ..., B=11)
+[[nodiscard]] int parseKeyName(const std::string& name);
+
+// Get all scale names with indexed IDs (for display)
+[[nodiscard]] std::vector<std::string> getScalesWithIds();
 
 } // namespace Music
 
