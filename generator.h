@@ -3,53 +3,24 @@
 
 #include <vector>
 #include <memory>
-#include <random>
-#include <optional>
 #include "fretboard.h"
 #include "music_theory.h"
+#include "random_engine.h"
 
 namespace Guitar {
 
 // ============================================================================
-// Constants - Biomechanically Organic Generation
+// Constants - Position Box Heuristic
 // ============================================================================
 
 constexpr int NUM_NOTES = 16;
 constexpr int MAX_CONSECUTIVE_SAME_STRING = 3;
-constexpr int MIN_CONSECUTIVE_SAME_STRING = 2;  // Allow 2-3 notes per string
-constexpr int MAX_FRET_DELTA = 4;  // Absolute max (4 frets = surprise)
-constexpr int SLIDING_WINDOW_SIZE = 3;  // Check 3 consecutive notes (N, N-1, N-2)
-constexpr int MAX_WINDOW_RANGE = 5;  // Max range in any 3-note window
+constexpr int POSITION_BOX_RADIUS = 4;  // ±4 frets from anchor
 
 // Weight constants for organic movement
-constexpr int WEIGHT_VERY_CLOSE = 70;  // 0-2 frets: very comfortable
-constexpr int WEIGHT_MEDIUM = 20;       // 3 frets: moderate stretch
-constexpr int WEIGHT_SURPRISE = 10;     // 4 frets: surprise note
-
-// Inertia constants
-constexpr int INERTIA_BONUS_SMALL_MOVE = 40;   // Bonus for small move after big jump
-constexpr int INERTIA_PENALTY_ZIGZAG = 50;     // Penalty for zigzag after big jump
-constexpr int BIG_JUMP_THRESHOLD = 3;          // Fret delta considered a "big jump"
-constexpr int SMALL_MOVE_DELTA = 1;            // What counts as a "small" move
-
-// ============================================================================
-// Random Engine with Weighted Distribution
-// ============================================================================
-
-class RandomEngine {
-public:
-    RandomEngine();
-
-    [[nodiscard]] int generateInt(int min_val, int max_val);
-    [[nodiscard]] bool generateBool();
-
-    // Select index based on weights using discrete_distribution
-    template<typename WeightType>
-    [[nodiscard]] int selectWeighted(const std::vector<WeightType>& weights);
-
-private:
-    std::mt19937 engine_;
-};
+constexpr int WEIGHT_CLOSE = 60;       // 0-2 frets: comfortable
+constexpr int WEIGHT_MEDIUM = 30;      // 3 frets: moderate
+constexpr int WEIGHT_FAR = 10;         // 4 frets: stretch
 
 // ============================================================================
 // Note Candidate with Weight
@@ -57,30 +28,28 @@ private:
 
 struct NoteCandidate {
     Note note;
-    int weight;  // Probability weight based on distance and inertia
+    int weight;  // Probability weight based on distance
     int fret_distance;  // Absolute distance from previous note
 };
 
 // ============================================================================
-// Movement History for Inertia Calculation
+// Position Box - Anchors the hand position for entire exercise
 // ============================================================================
 
-struct MovementHistory {
-    std::optional<int> last_fret_delta;   // N-1 to N-2 movement
-    std::optional<int> last_string_delta; // String change direction
+struct PositionBox {
+    int anchor_fret;   // First note's fret - anchors the position
+    int min_fret;      // Lower bound: max(0, anchor - 4)
+    int max_fret;      // Upper bound: min(MAX_FRET, anchor + 4)
 
-    [[nodiscard]] bool wasBigJump() const {
-        return last_fret_delta.has_value() && 
-               std::abs(*last_fret_delta) >= BIG_JUMP_THRESHOLD;
+    [[nodiscard]] bool contains(int fret) const {
+        return fret >= min_fret && fret <= max_fret;
     }
 
-    [[nodiscard]] int lastDelta() const {
-        return last_fret_delta.value_or(0);
-    }
+    void initialize(int first_fret);
 };
 
 // ============================================================================
-// Note Generator - Organic Movement with Inertia
+// Note Generator - Position Box with Free String Skipping
 // ============================================================================
 
 class NoteGenerator {
@@ -96,37 +65,23 @@ private:
         const Note& previous,
         int consecutive_same_string,
         bool must_change_string,
-        const std::vector<std::unique_ptr<Note>>& previous_notes,
-        MovementHistory& history
+        const std::vector<std::unique_ptr<Note>>& previous_notes
     );
 
     // Build list of valid candidates with weights
     [[nodiscard]] std::vector<NoteCandidate> buildCandidates(
         const Note& previous,
         bool must_change_string,
-        const std::vector<std::unique_ptr<Note>>& previous_notes,
-        const MovementHistory& history
+        const PositionBox& box
     );
 
-    // Calculate base weight based on fret distance
-    [[nodiscard]] int calculateBaseWeight(int fret_distance) const;
-
-    // Apply inertia modifier to weight
-    [[nodiscard]] int applyInertiaWeight(int base_weight, int fret_delta,
-                                          const MovementHistory& history) const;
-
-    // Check if note satisfies 3-note sliding window constraint
-    [[nodiscard]] bool isValidForWindow(
-        const Note& new_note,
-        const std::vector<std::unique_ptr<Note>>& previous_notes
-    ) const;
-
-    // Calculate fret delta between two notes (can be on different strings)
-    [[nodiscard]] int calculateFretDelta(const Note& from, const Note& to) const;
+    // Calculate weight based on fret distance
+    [[nodiscard]] int calculateWeight(int fret_distance) const;
 
     const FretboardValidator& validator_;
     RandomEngine rng_;
     std::vector<Note> valid_notes_cache_;
+    PositionBox position_box_;  // Global position anchor for entire exercise
 };
 
 // ============================================================================
@@ -139,17 +94,17 @@ public:
 
     // Generate new tablature (random key/scale)
     void generate();
-    
+
     // Regenerate with same key/scale (for re-roll)
     void regenerate();
-    
+
     // Set specific key and scale (for advanced mode)
     void setKeyAndScale(Music::KeyIndex key, const std::string& scale_name);
 
     [[nodiscard]] const std::vector<std::unique_ptr<Note>>& getNotes() const noexcept;
     [[nodiscard]] const Music::ScaleManager& getScaleManager() const noexcept;
     [[nodiscard]] InstrumentType getInstrumentType() const noexcept;
-    
+
     // Get current key index (for re-roll with same settings)
     [[nodiscard]] Music::KeyIndex getCurrentKeyIndex() const noexcept;
     [[nodiscard]] std::string getCurrentScaleName() const noexcept;

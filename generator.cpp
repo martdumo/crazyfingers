@@ -1,38 +1,17 @@
 #include "generator.h"
 #include <algorithm>
-#include <random>
-#include <numeric>
-#include <cmath>
 
 namespace Guitar {
 
 // ============================================================================
-// RandomEngine Implementation
+// PositionBox Implementation
 // ============================================================================
 
-RandomEngine::RandomEngine() : engine_{std::random_device{}()} {}
-
-int RandomEngine::generateInt(int min_val, int max_val) {
-    std::uniform_int_distribution<> dist(min_val, max_val);
-    return dist(engine_);
+void PositionBox::initialize(int first_fret) {
+    anchor_fret = first_fret;
+    min_fret = std::max(MIN_FRET, anchor_fret - POSITION_BOX_RADIUS);
+    max_fret = std::min(MAX_FRET, anchor_fret + POSITION_BOX_RADIUS);
 }
-
-bool RandomEngine::generateBool() {
-    std::uniform_int_distribution<> dist(0, 1);
-    return dist(engine_) == 0;
-}
-
-template<typename WeightType>
-int RandomEngine::selectWeighted(const std::vector<WeightType>& weights) {
-    if (weights.empty()) return -1;
-    if (weights.size() == 1) return 0;
-
-    std::discrete_distribution<int> dist(weights.begin(), weights.end());
-    return dist(engine_);
-}
-
-// Explicit template instantiation
-template int RandomEngine::selectWeighted<int>(const std::vector<int>&);
 
 // ============================================================================
 // NoteGenerator Implementation
@@ -41,40 +20,29 @@ template int RandomEngine::selectWeighted<int>(const std::vector<int>&);
 NoteGenerator::NoteGenerator(const FretboardValidator& validator)
     : validator_{validator}
     , rng_{}
-    , valid_notes_cache_{validator.getAllValidNotes()} {}
+    , valid_notes_cache_{validator.getAllValidNotes()}
+    , position_box_{} {}
 
 std::vector<std::unique_ptr<Note>> NoteGenerator::generateTablature() {
     std::vector<std::unique_ptr<Note>> notes;
     notes.reserve(NUM_NOTES);
 
-    // Generate first note
-    notes.push_back(generateFirstNote());
+    // Generate first note and initialize Position Box
+    auto first_note = generateFirstNote();
+    position_box_.initialize(first_note->fret.value);
+    notes.push_back(std::move(first_note));
 
-    // Generate remaining notes with movement history
+    // Generate remaining notes within Position Box
     int consecutive_same_string = 0;
-    MovementHistory history;
 
     for (int i = 1; i < NUM_NOTES; ++i) {
         const Note& previous = *notes[i - 1];
 
-        // Determine if we MUST change string
-        const bool must_change = (consecutive_same_string >= MAX_CONSECUTIVE_SAME_STRING);
+        // Force string change after 3 consecutive notes on same string
+        // (passed internally to buildCandidates via must_change_string logic)
+        const bool must_change_string = (consecutive_same_string >= MAX_CONSECUTIVE_SAME_STRING);
 
-        // Also force change if we've been on same string for MIN consecutive
-        // and random chance says to move (promotes variety)
-        const bool should_force_change = must_change ||
-            (consecutive_same_string >= MIN_CONSECUTIVE_SAME_STRING &&
-             rng_.generateInt(0, 2) == 0);  // 33% chance to move after 2 notes
-
-        auto next_note = generateNextNote(previous, consecutive_same_string,
-                                          should_force_change, notes, history);
-
-        // Update movement history for next iteration
-        if (notes.size() >= 2) {
-            const Note& prev_prev = *notes[notes.size() - 2];
-            history.last_fret_delta = calculateFretDelta(prev_prev, previous);
-            history.last_string_delta = next_note->string_idx.value - previous.string_idx.value;
-        }
+        auto next_note = generateNextNote(previous, consecutive_same_string, must_change_string, notes);
 
         // Track consecutive same string
         if (next_note->string_idx.value == previous.string_idx.value) {
@@ -117,11 +85,10 @@ std::unique_ptr<Note> NoteGenerator::generateNextNote(
     const Note& previous,
     int /* consecutive_same_string */,
     bool must_change_string,
-    const std::vector<std::unique_ptr<Note>>& previous_notes,
-    MovementHistory& history
+    const std::vector<std::unique_ptr<Note>>& /* previous_notes */
 ) {
-    // Build list of valid candidates with weights (including inertia)
-    auto candidates = buildCandidates(previous, must_change_string, previous_notes, history);
+    // Build list of valid candidates with weights
+    auto candidates = buildCandidates(previous, must_change_string, position_box_);
 
     // Emergency fallback if no candidates
     if (candidates.empty()) {
@@ -132,7 +99,7 @@ std::unique_ptr<Note> NoteGenerator::generateNextNote(
         note->string_idx.num_strings = validator_.getInstrument().num_strings;
 
         if (note->string_idx.value < 0) note->string_idx.value = 0;
-        if (note->string_idx.value >= validator_.getInstrument().num_strings) 
+        if (note->string_idx.value >= validator_.getInstrument().num_strings)
             note->string_idx.value = validator_.getInstrument().num_strings - 1;
 
         return note;
@@ -157,67 +124,49 @@ std::unique_ptr<Note> NoteGenerator::generateNextNote(
 std::vector<NoteCandidate> NoteGenerator::buildCandidates(
     const Note& previous,
     bool must_change_string,
-    const std::vector<std::unique_ptr<Note>>& previous_notes,
-    const MovementHistory& history
+    const PositionBox& box
 ) {
     std::vector<NoteCandidate> candidates;
-    candidates.reserve(27);  // Max: 3 strings x 9 frets (+-4)
+    const int num_strings = validator_.getInstrument().num_strings;
 
     // Determine which strings to consider
     std::vector<int> strings_to_check;
 
     if (must_change_string) {
-        // Must change to adjacent string
-        if (previous.string_idx.value > 0) {
-            strings_to_check.push_back(previous.string_idx.value - 1);
-        }
-        if (previous.string_idx.value < validator_.getInstrument().num_strings - 1) {
-            strings_to_check.push_back(previous.string_idx.value + 1);
+        // Must change string - but can skip to ANY string (free string skipping)
+        for (int s = 0; s < num_strings; ++s) {
+            if (s != previous.string_idx.value) {
+                strings_to_check.push_back(s);
+            }
         }
     } else {
-        // Can stay on same string or move to adjacent
-        strings_to_check.push_back(previous.string_idx.value);  // Same string
-        if (previous.string_idx.value > 0) {
-            strings_to_check.push_back(previous.string_idx.value - 1);
-        }
-        if (previous.string_idx.value < validator_.getInstrument().num_strings - 1) {
-            strings_to_check.push_back(previous.string_idx.value + 1);
+        // Can stay on same string or jump to any other string
+        for (int s = 0; s < num_strings; ++s) {
+            strings_to_check.push_back(s);
         }
     }
 
-    // For each string, find valid fret candidates
+    // For each string, find valid fret candidates within Position Box
     for (int str : strings_to_check) {
-        // Check frets from -MAX_FRET_DELTA to +MAX_FRET_DELTA
-        for (int delta = -MAX_FRET_DELTA; delta <= MAX_FRET_DELTA; ++delta) {
-            int test_fret = previous.fret.value + delta;
-
-            // Validate fret range
-            if (test_fret < MIN_FRET || test_fret > MAX_FRET) continue;
-
+        // Check all frets within the Position Box
+        for (int fret = box.min_fret; fret <= box.max_fret; ++fret) {
             // Skip if same note as previous (must be different)
-            if (str == previous.string_idx.value && delta == 0) continue;
+            if (str == previous.string_idx.value && fret == previous.fret.value) continue;
 
-            Note candidate_note{{str, validator_.getInstrument().num_strings}, {test_fret}};
+            Note candidate_note{{str, num_strings}, {fret}};
 
             // Check if note is in scale
             if (!validator_.isNoteInScale(candidate_note)) continue;
 
-            // Check anatomical possibility (max 4 frets)
-            int fret_distance = std::abs(delta);
-            if (fret_distance > MAX_FRET_DELTA) continue;
+            // Calculate fret distance from previous note for weighting
+            int fret_distance = std::abs(fret - previous.fret.value);
 
-            // Check 3-note sliding window constraint (N, N-1, N-2 must fit in 5 frets)
-            if (!isValidForWindow(candidate_note, previous_notes)) continue;
+            // Calculate weight based on distance
+            int weight = calculateWeight(fret_distance);
 
-            // Calculate base weight based on fret distance
-            int weight = calculateBaseWeight(fret_distance);
-
-            // Apply inertia modifier (rewards settling after big jumps, penalizes zigzag)
-            weight = applyInertiaWeight(weight, delta, history);
-
-            // Add bonus weight for staying on same string (promotes fluency)
+            // Bonus for staying on same string (promotes fluency when possible)
             if (str == previous.string_idx.value) {
-                weight = static_cast<int>(weight * 1.3);  // 30% bonus
+                weight = static_cast<int>(weight * 1.2);  // 20% bonus
             }
 
             candidates.push_back({candidate_note, weight, fret_distance});
@@ -227,90 +176,28 @@ std::vector<NoteCandidate> NoteGenerator::buildCandidates(
     return candidates;
 }
 
-int NoteGenerator::calculateBaseWeight(int fret_distance) const {
+int NoteGenerator::calculateWeight(int fret_distance) const {
     // Weight system based on comfort level
     switch (fret_distance) {
         case 0:
             // Same fret, different string (very comfortable)
-            return WEIGHT_VERY_CLOSE;
+            return WEIGHT_CLOSE;
         case 1:
-            // 1 fret distance (very comfortable - adjacent scale degrees)
-            return WEIGHT_VERY_CLOSE;
+            // 1 fret distance (very comfortable)
+            return WEIGHT_CLOSE;
         case 2:
-            // 2 frets distance (comfortable - common interval)
-            return WEIGHT_VERY_CLOSE;
+            // 2 frets distance (comfortable)
+            return WEIGHT_CLOSE;
         case 3:
-            // 3 frets distance (moderate stretch)
+            // 3 frets distance (moderate)
             return WEIGHT_MEDIUM;
         case 4:
-            // 4 frets distance (surprise note - use sparingly)
-            return WEIGHT_SURPRISE;
+            // 4 frets distance (stretch - use sparingly)
+            return WEIGHT_FAR;
         default:
-            // Should not reach here, but return 0 for safety
+            // Should not reach here within Position Box
             return 0;
     }
-}
-
-int NoteGenerator::applyInertiaWeight(int base_weight, int fret_delta,
-                                       const MovementHistory& history) const {
-    // If last movement was NOT a big jump, no inertia adjustment needed
-    if (!history.wasBigJump()) {
-        return base_weight;
-    }
-
-    const int last_delta = history.lastDelta();
-
-    // INERTIA RULE 1: After a big jump, reward small moves (0, +1, -1)
-    // This represents "settling" the hand after a stretch
-    if (std::abs(fret_delta) <= SMALL_MOVE_DELTA) {
-        return base_weight + INERTIA_BONUS_SMALL_MOVE;
-    }
-
-    // INERTIA RULE 2: Penalize zigzag (big jump in opposite direction)
-    // If last was +3 or more, penalize -3 or more (and vice versa)
-    if ((last_delta > 0 && fret_delta < -BIG_JUMP_THRESHOLD) ||
-        (last_delta < 0 && fret_delta > BIG_JUMP_THRESHOLD)) {
-        return std::max(0, base_weight - INERTIA_PENALTY_ZIGZAG);
-    }
-
-    // INERTIA RULE 3: Continuing in same direction is okay (slight penalty for another big jump)
-    if ((last_delta > 0 && fret_delta > 0) || (last_delta < 0 && fret_delta < 0)) {
-        if (std::abs(fret_delta) >= BIG_JUMP_THRESHOLD) {
-            return std::max(0, base_weight - 10);  // Small penalty for consecutive big jumps
-        }
-    }
-
-    return base_weight;
-}
-
-bool NoteGenerator::isValidForWindow(
-    const Note& new_note,
-    const std::vector<std::unique_ptr<Note>>& previous_notes
-) const {
-    // Need at least 2 previous notes to form a 3-note window
-    if (previous_notes.size() < SLIDING_WINDOW_SIZE - 1) {
-        return true;
-    }
-
-    // Check the last 2 notes + new note (3-note window: N, N-1, N-2)
-    size_t start_idx = previous_notes.size() - (SLIDING_WINDOW_SIZE - 1);
-
-    int min_fret = new_note.fret.value;
-    int max_fret = new_note.fret.value;
-
-    for (size_t i = start_idx; i < previous_notes.size(); ++i) {
-        int f = previous_notes[i]->fret.value;
-        if (f < min_fret) min_fret = f;
-        if (f > max_fret) max_fret = f;
-    }
-
-    // STRICT RULE: Hand span in any 3-note group must not exceed 5 frets
-    return (max_fret - min_fret) <= MAX_WINDOW_RANGE;
-}
-
-int NoteGenerator::calculateFretDelta(const Note& from, const Note& to) const {
-    // Simple fret difference (positive = up the neck, negative = down)
-    return to.fret.value - from.fret.value;
 }
 
 // ============================================================================
@@ -337,7 +224,6 @@ void TablatureGenerator::generate() {
 
 void TablatureGenerator::regenerate() {
     // Regenerate with same key/scale (don't call selectRandomKeyAndScale)
-    // Rebuild validator with current scale
     validator_ = std::make_unique<FretboardValidator>(scale_mgr_, instrument_);
     note_gen_ = std::make_unique<NoteGenerator>(*validator_);
     notes_ = note_gen_->generateTablature();
