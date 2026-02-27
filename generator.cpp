@@ -1,5 +1,6 @@
 #include "generator.h"
 #include <algorithm>
+#include <limits>
 
 namespace Guitar {
 
@@ -21,15 +22,27 @@ NoteGenerator::NoteGenerator(const FretboardValidator& validator)
     : validator_{validator}
     , rng_{}
     , valid_notes_cache_{validator.getAllValidNotes()}
-    , position_box_{} {}
+    , position_box_{}
+    , global_min_pitch_{std::numeric_limits<int>::max()}
+    , global_max_pitch_{std::numeric_limits<int>::min()} {}
 
 std::vector<std::unique_ptr<Note>> NoteGenerator::generateTablature() {
     std::vector<std::unique_ptr<Note>> notes;
     notes.reserve(NUM_NOTES);
 
+    // Reset pitch tracking
+    global_min_pitch_ = std::numeric_limits<int>::max();
+    global_max_pitch_ = std::numeric_limits<int>::min();
+
     // Generate first note and initialize Position Box
     auto first_note = generateFirstNote();
     position_box_.initialize(first_note->fret.value);
+    
+    // Update global pitch range with first note
+    int first_pitch = getNotePitch(*first_note);
+    global_min_pitch_ = first_pitch;
+    global_max_pitch_ = first_pitch;
+    
     notes.push_back(std::move(first_note));
 
     // Generate remaining notes within Position Box
@@ -39,10 +52,14 @@ std::vector<std::unique_ptr<Note>> NoteGenerator::generateTablature() {
         const Note& previous = *notes[i - 1];
 
         // Force string change after 3 consecutive notes on same string
-        // (passed internally to buildCandidates via must_change_string logic)
         const bool must_change_string = (consecutive_same_string >= MAX_CONSECUTIVE_SAME_STRING);
 
         auto next_note = generateNextNote(previous, consecutive_same_string, must_change_string, notes);
+
+        // Update global pitch range
+        int pitch = getNotePitch(*next_note);
+        if (pitch < global_min_pitch_) global_min_pitch_ = pitch;
+        if (pitch > global_max_pitch_) global_max_pitch_ = pitch;
 
         // Track consecutive same string
         if (next_note->string_idx.value == previous.string_idx.value) {
@@ -85,13 +102,20 @@ std::unique_ptr<Note> NoteGenerator::generateNextNote(
     const Note& previous,
     int /* consecutive_same_string */,
     bool must_change_string,
-    const std::vector<std::unique_ptr<Note>>& /* previous_notes */
+    const std::vector<std::unique_ptr<Note>>& previous_notes
 ) {
-    // Build list of valid candidates with weights
-    auto candidates = buildCandidates(previous, must_change_string, position_box_);
+    // Build list of valid candidates with weights (includes pitch validation)
+    auto candidates = buildCandidates(previous, must_change_string, position_box_, previous_notes);
 
     // Emergency fallback if no candidates
     if (candidates.empty()) {
+        // Try to find the closest valid note by pitch
+        auto fallback_note = findClosestPitchNote(previous, previous_notes);
+        if (fallback_note) {
+            return fallback_note;
+        }
+        
+        // Ultimate fallback: adjacent string, same fret
         auto note = std::make_unique<Note>();
         note->string_idx.value = (previous.string_idx.value < validator_.getInstrument().num_strings / 2) ?
                                  previous.string_idx.value + 1 : previous.string_idx.value - 1;
@@ -124,7 +148,8 @@ std::unique_ptr<Note> NoteGenerator::generateNextNote(
 std::vector<NoteCandidate> NoteGenerator::buildCandidates(
     const Note& previous,
     bool must_change_string,
-    const PositionBox& box
+    const PositionBox& box,
+    const std::vector<std::unique_ptr<Note>>& previous_notes
 ) {
     std::vector<NoteCandidate> candidates;
     const int num_strings = validator_.getInstrument().num_strings;
@@ -157,6 +182,15 @@ std::vector<NoteCandidate> NoteGenerator::buildCandidates(
 
             // Check if note is in scale
             if (!validator_.isNoteInScale(candidate_note)) continue;
+
+            // PITCH CONTROL VALIDATION
+            int candidate_pitch = getNotePitch(candidate_note);
+
+            // Rule 1: Local range (last 4 notes + candidate must fit in 1 octave)
+            if (!isValidForLocalRange(candidate_note, previous_notes)) continue;
+
+            // Rule 2: Global range (entire exercise must fit in 2 octaves)
+            if (!isValidForGlobalRange(candidate_pitch)) continue;
 
             // Calculate fret distance from previous note for weighting
             int fret_distance = std::abs(fret - previous.fret.value);
@@ -198,6 +232,84 @@ int NoteGenerator::calculateWeight(int fret_distance) const {
             // Should not reach here within Position Box
             return 0;
     }
+}
+
+bool NoteGenerator::isValidForLocalRange(
+    const Note& candidate,
+    const std::vector<std::unique_ptr<Note>>& previous_notes
+) const {
+    if (previous_notes.empty()) return true;
+
+    // Get the last LOCAL_WINDOW_SIZE notes (or fewer if not enough)
+    size_t start_idx = previous_notes.size() > LOCAL_WINDOW_SIZE
+                       ? previous_notes.size() - LOCAL_WINDOW_SIZE
+                       : 0;
+
+    int candidate_pitch = getNotePitch(candidate);
+    int min_pitch = candidate_pitch;
+    int max_pitch = candidate_pitch;
+
+    // Check against the last N notes
+    for (size_t i = start_idx; i < previous_notes.size(); ++i) {
+        int pitch = getNotePitch(*previous_notes[i]);
+        if (pitch < min_pitch) min_pitch = pitch;
+        if (pitch > max_pitch) max_pitch = pitch;
+    }
+
+    // Local range must not exceed 1 octave (12 semitones)
+    return (max_pitch - min_pitch) <= MAX_LOCAL_RANGE;
+}
+
+bool NoteGenerator::isValidForGlobalRange(int candidate_pitch) const {
+    // Calculate what the new global range would be
+    int new_min = candidate_pitch < global_min_pitch_ ? candidate_pitch : global_min_pitch_;
+    int new_max = candidate_pitch > global_max_pitch_ ? candidate_pitch : global_max_pitch_;
+
+    // Global range must not exceed 2 octaves (24 semitones)
+    return (new_max - new_min) <= MAX_GLOBAL_RANGE;
+}
+
+int NoteGenerator::getNotePitch(const Note& note) const {
+    return validator_.getInstrument().getOpenStringMidi()[note.string_idx.value] + note.fret.value;
+}
+
+std::unique_ptr<Note> NoteGenerator::findClosestPitchNote(
+    const Note& previous,
+    const std::vector<std::unique_ptr<Note>>& previous_notes
+) {
+    const int num_strings = validator_.getInstrument().num_strings;
+    int previous_pitch = getNotePitch(previous);
+    
+    Note* best_note = nullptr;
+    int best_distance = std::numeric_limits<int>::max();
+
+    // Search through valid notes cache for closest pitch that passes validations
+    for (const auto& cached : valid_notes_cache_) {
+        // Must be in position box
+        if (!position_box_.contains(cached.fret.value)) continue;
+
+        int pitch = getNotePitch(cached);
+        int distance = std::abs(pitch - previous_pitch);
+
+        // Check local range
+        if (!isValidForLocalRange(cached, previous_notes)) continue;
+
+        // Check global range
+        if (!isValidForGlobalRange(pitch)) continue;
+
+        if (distance < best_distance) {
+            best_distance = distance;
+            best_note = const_cast<Note*>(&cached);
+        }
+    }
+
+    if (best_note) {
+        auto note = std::make_unique<Note>(*best_note);
+        note->string_idx.num_strings = num_strings;
+        return note;
+    }
+
+    return nullptr;
 }
 
 // ============================================================================

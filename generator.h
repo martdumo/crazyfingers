@@ -10,12 +10,17 @@
 namespace Guitar {
 
 // ============================================================================
-// Constants - Position Box Heuristic
+// Constants - Position Box Heuristic + Pitch Control
 // ============================================================================
 
 constexpr int NUM_NOTES = 16;
 constexpr int MAX_CONSECUTIVE_SAME_STRING = 3;
 constexpr int POSITION_BOX_RADIUS = 4;  // ±4 frets from anchor
+
+// Pitch Control Constants
+constexpr int MAX_LOCAL_RANGE = 12;   // 1 octave (5-note window)
+constexpr int MAX_GLOBAL_RANGE = 24;  // 2 octaves (entire exercise)
+constexpr int LOCAL_WINDOW_SIZE = 4;  // Check last 4 notes + candidate
 
 // Weight constants for organic movement
 constexpr int WEIGHT_CLOSE = 60;       // 0-2 frets: comfortable
@@ -72,16 +77,33 @@ private:
     [[nodiscard]] std::vector<NoteCandidate> buildCandidates(
         const Note& previous,
         bool must_change_string,
-        const PositionBox& box
+        const PositionBox& box,
+        const std::vector<std::unique_ptr<Note>>& previous_notes
     );
 
     // Calculate weight based on fret distance
     [[nodiscard]] int calculateWeight(int fret_distance) const;
 
+    // Pitch validation helpers
+    [[nodiscard]] bool isValidForLocalRange(const Note& candidate,
+                                             const std::vector<std::unique_ptr<Note>>& previous_notes) const;
+    [[nodiscard]] bool isValidForGlobalRange(int candidate_pitch) const;
+    [[nodiscard]] int getNotePitch(const Note& note) const;
+    
+    // Fallback helper
+    [[nodiscard]] std::unique_ptr<Note> findClosestPitchNote(
+        const Note& previous,
+        const std::vector<std::unique_ptr<Note>>& previous_notes
+    );
+
     const FretboardValidator& validator_;
     RandomEngine rng_;
     std::vector<Note> valid_notes_cache_;
     PositionBox position_box_;  // Global position anchor for entire exercise
+    
+    // Pitch tracking for global range validation
+    int global_min_pitch_;
+    int global_max_pitch_;
 };
 
 // ============================================================================
