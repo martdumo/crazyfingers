@@ -250,6 +250,44 @@ body {
     transform: translateY(-1px);
 }
 
+/* ==========================================================================
+   Copy Button (Clipboard)
+   ========================================================================== */
+
+.btn-copy {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border: 1px solid var(--accent-celeste);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--accent-celeste);
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    position: absolute;
+    top: var(--spacing-sm);
+    right: var(--spacing-sm);
+}
+
+.btn-copy:hover {
+    background: var(--accent-celeste);
+    color: var(--bg-base);
+    box-shadow: 0 0 10px rgba(116, 172, 223, 0.4);
+    transform: translateY(-2px);
+}
+
+.btn-copy:active {
+    transform: translateY(0);
+}
+
+.tab-wrapper {
+    position: relative;
+}
+
 .btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;

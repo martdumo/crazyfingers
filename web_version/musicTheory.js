@@ -19,7 +19,7 @@ export const NOTE_NAMES = [
 // Scale Dictionary - Over 70 scales from ethnomusicology consensus
 // ============================================================================
 
-const SCALE_DICTIONARY = {
+export const SCALE_DICTIONARY = {
     // Common/Modes
     "Major": [2, 2, 1, 2, 2, 2, 1],
     "Harmonic Minor": [2, 1, 2, 2, 1, 3, 1],

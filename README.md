@@ -10,7 +10,7 @@
 [![CSS3](https://img.shields.io/badge/CSS3-3-blue?style=for-the-badge&logo=css3)](https://www.w3.org/Style/CSS/)
 
 **Hecha por Martin Alfredo Dumont**  
-*Todos los Derechos Reservados © 2024*
+*Todos los Derechos Reservados © 2026*
 
 ---
 

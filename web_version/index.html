@@ -26,7 +26,7 @@
                 <div class="control-group">
                     <label for="rootKey">Tonalidad</label>
                     <select id="rootKey">
-                        <option value="random">🎲 Aleatorio</option>
+                        <option value="random" selected>🎲 Aleatorio</option>
                         <option value="C">C</option>
                         <option value="C#">C# / Db</option>
                         <option value="D">D</option>
@@ -45,26 +45,8 @@
                 <div class="control-group">
                     <label for="scale">Escala</label>
                     <select id="scale">
-                        <option value="random">🎲 Aleatorio</option>
-                        <option value="Major">Major</option>
-                        <option value="Natural Minor">Natural Minor</option>
-                        <option value="Harmonic Minor">Harmonic Minor</option>
-                        <option value="Melodic Minor">Melodic Minor</option>
-                        <option value="Pentatonic Major">Pentatonic Major</option>
-                        <option value="Pentatonic Minor">Pentatonic Minor</option>
-                        <option value="Pentatonic Blues">Pentatonic Blues</option>
-                        <option value="Dorian">Dorian</option>
-                        <option value="Phrygian">Phrygian</option>
-                        <option value="Lydian">Lydian</option>
-                        <option value="Mixolydian">Mixolydian</option>
-                        <option value="Aeolian">Aeolian</option>
-                        <option value="Locrian">Locrian</option>
-                        <option value="Blues">Blues</option>
-                        <option value="Whole Tone">Whole Tone</option>
-                        <option value="Chromatic">Chromatic</option>
-                        <option value="Spanish Gypsy">Spanish Gypsy</option>
-                        <option value="Hungarian Minor">Hungarian Minor</option>
-                        <option value="Japanese #1">Japanese #1</option>
+                        <option value="random" selected>🎲 Aleatorio</option>
+                        <!-- Las escalas se cargan dinámicamente desde musicTheory.js -->
                     </select>
                 </div>
             </div>
@@ -81,6 +63,9 @@
             <div id="result-container" class="result-container hidden">
                 <div class="tab-wrapper">
                     <pre id="output"></pre>
+                    <button id="btn-copy" class="btn-copy" style="display: none;">
+                        📋 Copiar Tablatura
+                    </button>
                 </div>
 
                 <div class="info-section">
